@@ -1,0 +1,5 @@
+name,tunerMode,lnbMode,lnbLocal,tunerSymbolRate,tunerFrequency,satlliteLon
+test,DVB,H_OFF,9850000,27600000,11280000,400
+test,Beacon,V_High,9550000,26000000,11240000,400
+test,Beacon,V_High,9550000,26000000,11240000,400
+test,DVB,H_OFF,9850000,27600000,11280000,400

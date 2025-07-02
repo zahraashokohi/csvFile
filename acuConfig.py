@@ -2,8 +2,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import csv
 import os
+
 print("آیکون موجوده؟", os.path.exists("eshtad.ico"))
-# تعریف فیلدها و محدودیت‌ها
+
 fields = {
     "name": {"type": "text"},
     "tunerMode": {"type": "dropdown", "options": ["DVB", "Beacon"]},
@@ -25,18 +26,58 @@ def load_csv_file():
     global csv_path, csv_data
     path = filedialog.askopenfilename(
         filetypes=[("CSV files", "*.csv")],
-        title="Select CSV Config File"
+        title="Select CSV Config File",
+        parent=root
     )
-    if not path:
+
+    if path:
+        csv_path = path
+        with open(csv_path, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            csv_data = list(reader)
+        update_treeview()
+        config_status.config(text=f"{len(csv_data)} configs loaded from:\n{csv_path}")
+    else:
+        create_new = messagebox.askyesno(
+            "No File Selected",
+            "No file was selected.\nWould you like to create a new config file named 'config1.csv'?",
+            parent=root
+        )
+        if not create_new:
+            return
+
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")],
+            initialfile="config1.csv",
+            title="Save new config file as",
+            parent=root
+        )
+        if not save_path:
+            return
+
+        csv_path = save_path
+        csv_data = []
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=ordered_keys)
+            writer.writeheader()
+        update_treeview()
+        config_status.config(text=f"New empty config file created:\n{csv_path}")
+
+def save_new_config_file():
+    global csv_path, csv_data
+    dir_path = filedialog.askdirectory(title="Select Directory to Save config1.csv", parent=root)
+    if not dir_path:
         return
-
-    csv_path = path
-    with open(csv_path, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        csv_data = list(reader)
-
+    save_path = os.path.join(dir_path, "config1.csv")
+    csv_path = save_path
+    csv_data = []
+    with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=ordered_keys)
+        writer.writeheader()
     update_treeview()
-    config_status.config(text=f"{len(csv_data)} configs loaded from:\n{csv_path}")
+    messagebox.showinfo("File Created", f"New config file created:\n{csv_path}", parent=root)
+    config_status.config(text=f"New empty config file created:\n{csv_path}")
 
 def update_treeview():
     for i in tree.get_children():
@@ -62,7 +103,7 @@ def on_tree_select(event):
 
 def save_changes_to_csv():
     if csv_path is None or selected_index is None:
-        messagebox.showerror("Error", "Please load and select a config first.")
+        messagebox.showerror("Error", "Please load and select a config first.", parent=root)
         return
 
     updated_row = {}
@@ -80,32 +121,95 @@ def save_changes_to_csv():
                 raise ValueError
             updated_row[key] = str(value)
         except:
-            messagebox.showerror("Error", f"Invalid value for {key}")
+            messagebox.showerror("Error", f"Invalid value for {key}", parent=root)
             return
 
-    # بروزرسانی مقدار در لیست اصلی
     csv_data[selected_index] = updated_row
-
-    # اطمینان از اینکه همه ردیف‌ها فقط کلیدهای استاندارد دارند
     for i, row in enumerate(csv_data):
         cleaned_row = {k: row.get(k, "") for k in ordered_keys}
         csv_data[i] = cleaned_row
 
-    # بازنویسی فایل
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=ordered_keys)
         writer.writeheader()
         writer.writerows(csv_data)
 
     update_treeview()
-    messagebox.showinfo("Saved", "Changes saved to CSV.")
+    messagebox.showinfo("Saved", "Changes saved to CSV.", parent=root)
 
-# رابط کاربری
+def add_new_config_row():
+    global csv_data, csv_path
+    if csv_path is None:
+        messagebox.showerror("Error", "Please load or create a config file first.", parent=root)
+        return
+
+    new_row = {}
+    for key, config in fields.items():
+        value = entries[key].get()
+        try:
+            if config['type'] == 'int':
+                value = int(value)
+                if not (config["min"] <= value <= config["max"]):
+                    raise ValueError
+            elif config['type'] == 'dropdown':
+                if value not in config['options']:
+                    raise ValueError
+            elif config['type'] == 'text' and not value.strip():
+                raise ValueError
+            new_row[key] = str(value)
+        except:
+            messagebox.showerror("Error", f"Invalid value for {key}", parent=root)
+            return
+
+    csv_data.append(new_row)
+
+    with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=ordered_keys)
+        writer.writeheader()
+        writer.writerows(csv_data)
+
+    update_treeview()
+
+    for key, widget in entries.items():
+        if isinstance(widget, tk.StringVar):
+            widget.set('')
+        else:
+            widget.delete(0, tk.END)
+
+    messagebox.showinfo("Success", "New config row added and saved.", parent=root)
+
+def delete_selected_config():
+    global csv_data, csv_path, selected_index
+    if csv_path is None or selected_index is None:
+        messagebox.showerror("Error", "Please load and select a config to delete.", parent=root)
+        return
+
+    confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete the selected config?", parent=root)
+    if not confirm:
+        return
+
+    del csv_data[selected_index]
+    selected_index = None
+
+    with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=ordered_keys)
+        writer.writeheader()
+        writer.writerows(csv_data)
+
+    update_treeview()
+
+    for key, widget in entries.items():
+        if isinstance(widget, tk.StringVar):
+            widget.set('')
+        else:
+            widget.delete(0, tk.END)
+
+    messagebox.showinfo("Deleted", "Selected config deleted successfully.", parent=root)
+
 root = tk.Tk()
 root.iconbitmap(r"d:\shokouhi\csvFile\eshtad.ico")
 root.title("Acu Config")
 
-# فرم فیلدها
 for idx, (key, config) in enumerate(fields.items()):
     label = tk.Label(root, text=key)
     label.grid(row=idx, column=0, padx=5, pady=3, sticky="e")
@@ -120,23 +224,27 @@ for idx, (key, config) in enumerate(fields.items()):
         entry.grid(row=idx, column=1, padx=5, pady=3)
         entries[key] = entry
 
-# دکمه لود فایل
 load_btn = tk.Button(root, text="Load Config File", command=load_csv_file)
 load_btn.grid(row=0, column=2, padx=10, pady=5)
 
-# دکمه ذخیره تغییرات
 save_btn = tk.Button(root, text="Save Changes", command=save_changes_to_csv)
 save_btn.grid(row=1, column=2, padx=10, pady=5)
 
-# وضعیت فایل
+new_file_btn = tk.Button(root, text="Save New Config File", command=save_new_config_file)
+new_file_btn.grid(row=2, column=2, padx=10, pady=5)
+
+add_btn = tk.Button(root, text="Add New Config", command=add_new_config_row)
+add_btn.grid(row=3, column=2, padx=10, pady=5)
+
+delete_btn = tk.Button(root, text="Delete Selected Config", command=delete_selected_config)
+delete_btn.grid(row=4, column=2, padx=10, pady=5)
+
 config_status = tk.Label(root, text="No Config loaded", fg="green", wraplength=300, justify="left")
-config_status.grid(row=2, column=2, padx=10, pady=5)
+config_status.grid(row=5, column=2, padx=10, pady=5)
 
-# اسم فایل 
-config_status = tk.Label(root, text="The name of the config file should be \"config1.csv\"", fg="red", wraplength=300, justify="left")
-config_status.grid(row=3, column=2, padx=10, pady=5)
+filename_note = tk.Label(root, text="The name of the config file should be \"config1.csv\"", fg="red", wraplength=300, justify="left")
+filename_note.grid(row=6, column=2, padx=10, pady=5)
 
-# Treeview برای لیست کانفیگ‌ها
 tree = ttk.Treeview(root, columns=ordered_keys, show="headings", height=10)
 for col in ordered_keys:
     tree.heading(col, text=col)
