@@ -1,0 +1,3 @@
+pip install pyinstaller
+cd path_to_your_code_folder
+pyinstaller --onefile --windowed --icon=eshtad.ico acuConfig.py

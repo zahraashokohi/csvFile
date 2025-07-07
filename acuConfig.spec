@@ -5,7 +5,7 @@ a = Analysis(
     ['acuConfig.py'],
     pathex=[],
     binaries=[],
-    datas=[('eshtad.ico', '.')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

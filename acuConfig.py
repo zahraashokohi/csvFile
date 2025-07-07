@@ -22,6 +22,22 @@ csv_path = None
 csv_data = []
 selected_index = None
 
+def add_placeholder(entry, placeholder_text):
+    def on_focus_in(event):
+        if entry.get() == placeholder_text:
+            entry.delete(0, tk.END)
+            entry.config(fg='black')
+
+    def on_focus_out(event):
+        if entry.get() == '':
+            entry.insert(0, placeholder_text)
+            entry.config(fg='gray')
+
+    entry.insert(0, placeholder_text)
+    entry.config(fg='gray')
+    entry.bind("<FocusIn>", on_focus_in)
+    entry.bind("<FocusOut>", on_focus_out)
+
 def load_csv_file():
     global csv_path, csv_data
     path = filedialog.askopenfilename(
@@ -95,11 +111,20 @@ def on_tree_select(event):
     row = csv_data[selected_index]
     for key in fields:
         value = row.get(key, "")
-        if isinstance(entries[key], tk.StringVar):
-            entries[key].set(value)
+        widget = entries[key]
+        placeholder = None
+        if fields[key]['type'] == 'int':
+            placeholder = f"{fields[key]['min']} - {fields[key]['max']}"
+        if isinstance(widget, tk.StringVar):
+            widget.set(value)
         else:
-            entries[key].delete(0, tk.END)
-            entries[key].insert(0, str(value))
+            widget.delete(0, tk.END)
+            if value.strip() == "" and placeholder is not None:
+                widget.insert(0, placeholder)
+                widget.config(fg='gray')
+            else:
+                widget.insert(0, str(value))
+                widget.config(fg='black')
 
 def save_changes_to_csv():
     if csv_path is None or selected_index is None:
@@ -108,12 +133,19 @@ def save_changes_to_csv():
 
     updated_row = {}
     for key, config in fields.items():
-        value = entries[key].get()
+        widget = entries[key]
+        value = widget.get()
+        placeholder = None
+        if config['type'] == 'int':
+            placeholder = f"{config['min']} - {config['max']}"
+        if value == placeholder:
+            value = ''
         try:
             if config['type'] == 'int':
-                value = int(value)
-                if not (config["min"] <= value <= config["max"]):
+                value_int = int(value)
+                if not (config["min"] <= value_int <= config["max"]):
                     raise ValueError
+                value = value_int
             elif config['type'] == 'dropdown':
                 if value not in config['options']:
                     raise ValueError
@@ -145,12 +177,19 @@ def add_new_config_row():
 
     new_row = {}
     for key, config in fields.items():
-        value = entries[key].get()
+        widget = entries[key]
+        value = widget.get()
+        placeholder = None
+        if config['type'] == 'int':
+            placeholder = f"{config['min']} - {config['max']}"
+        if value == placeholder:
+            value = ''
         try:
             if config['type'] == 'int':
-                value = int(value)
-                if not (config["min"] <= value <= config["max"]):
+                value_int = int(value)
+                if not (config["min"] <= value_int <= config["max"]):
                     raise ValueError
+                value = value_int
             elif config['type'] == 'dropdown':
                 if value not in config['options']:
                     raise ValueError
@@ -174,7 +213,15 @@ def add_new_config_row():
         if isinstance(widget, tk.StringVar):
             widget.set('')
         else:
-            widget.delete(0, tk.END)
+            placeholder = None
+            if fields[key]['type'] == 'int':
+                placeholder = f"{fields[key]['min']} - {fields[key]['max']}"
+            if placeholder is not None:
+                widget.delete(0, tk.END)
+                widget.insert(0, placeholder)
+                widget.config(fg='gray')
+            else:
+                widget.delete(0, tk.END)
 
     messagebox.showinfo("Success", "New config row added and saved.", parent=root)
 
@@ -202,9 +249,18 @@ def delete_selected_config():
         if isinstance(widget, tk.StringVar):
             widget.set('')
         else:
-            widget.delete(0, tk.END)
+            placeholder = None
+            if fields[key]['type'] == 'int':
+                placeholder = f"{fields[key]['min']} - {fields[key]['max']}"
+            if placeholder is not None:
+                widget.delete(0, tk.END)
+                widget.insert(0, placeholder)
+                widget.config(fg='gray')
+            else:
+                widget.delete(0, tk.END)
 
-    messagebox.showinfo("Deleted", "Selected config deleted successfully.", parent=root)
+    messagebox.showinfo("Deleted", "Selected config has been deleted.", parent=root)
+    
 
 root = tk.Tk()
 root.iconbitmap(r"d:\shokouhi\csvFile\eshtad.ico")
@@ -222,6 +278,9 @@ for idx, (key, config) in enumerate(fields.items()):
     else:
         entry = tk.Entry(root)
         entry.grid(row=idx, column=1, padx=5, pady=3)
+        if config["type"] == "int":
+            placeholder = f"{config['min']} - {config['max']}"
+            add_placeholder(entry, placeholder)
         entries[key] = entry
 
 load_btn = tk.Button(root, text="Load Config File", command=load_csv_file)
@@ -230,20 +289,20 @@ load_btn.grid(row=0, column=2, padx=10, pady=5)
 save_btn = tk.Button(root, text="Save Changes", command=save_changes_to_csv)
 save_btn.grid(row=1, column=2, padx=10, pady=5)
 
-new_file_btn = tk.Button(root, text="Save New Config File", command=save_new_config_file)
-new_file_btn.grid(row=2, column=2, padx=10, pady=5)
-
 add_btn = tk.Button(root, text="Add New Config", command=add_new_config_row)
-add_btn.grid(row=3, column=2, padx=10, pady=5)
+add_btn.grid(row=2, column=2, padx=10, pady=5)
 
 delete_btn = tk.Button(root, text="Delete Selected Config", command=delete_selected_config)
-delete_btn.grid(row=4, column=2, padx=10, pady=5)
+delete_btn.grid(row=3, column=2, padx=10, pady=5)
+
+save_file_btn = tk.Button(root, text="Create New config1.csv File", command=save_new_config_file)
+save_file_btn.grid(row=4, column=2, padx=10, pady=5)
 
 config_status = tk.Label(root, text="No Config loaded", fg="green", wraplength=300, justify="left")
 config_status.grid(row=5, column=2, padx=10, pady=5)
 
-filename_note = tk.Label(root, text="The name of the config file should be \"config1.csv\"", fg="red", wraplength=300, justify="left")
-filename_note.grid(row=6, column=2, padx=10, pady=5)
+config_status_filehint = tk.Label(root, text="The name of the config file should be \"config1.csv\"", fg="red", wraplength=300, justify="left")
+config_status_filehint.grid(row=6, column=2, padx=10, pady=5)
 
 tree = ttk.Treeview(root, columns=ordered_keys, show="headings", height=10)
 for col in ordered_keys:
